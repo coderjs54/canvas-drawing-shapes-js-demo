@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>canvas-drawing-shapes</title>
+  <style>
+    :root {
+      --h: 24px
+    }
+    html {
+      background-color: #f5f5f5;
+    }
+    body {
+      width: 1500px;
+      margin: 20px auto 0;
+    }
+    span {
+      line-height: var(--h);
+    }
+    input[type=color] {
+      height: var(--h);
+    }
+    input[type=number] {
+      height: calc(var(--h) - 4px);
+      padding: 0 0 0 2px;
+    }
+    label {
+      margin-right: 5px;
+    }
+    button {
+      height: var(--h);
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+    input[name="shape"] {
+      accent-color: #74992e;
+    }
+    input[name="shape"]:checked ~ span {
+      color: #74992e;
+    }
+    .wrapper {
+      text-align: center;
+    }
+    canvas {
+      border: 1px solid rgb(49, 48, 48);
+      background-color: #f3f3f3;
+    }
+  </style>
+</head>
+<body>
+<script>
+  const ShapeMap = {
+    Line: 'Line',
+    Rectangle: 'Rectangle',
+    FillRectangle: 'FillRectangle',
+    Circle: 'Circle',
+    FillCircle: 'FillCircle'
+  }
+
+  class Shape {
+    constructor(color, lineWidth, x1, y1, x2, y2) {
+      this.color = color
+      this.lineWidth = Math.max(1, lineWidth)
+      this.x1 = x1
+      this.y1= y1
+      this.x2 = x2
+      this.y2 = y2
+    }
+
+    draw(context) {
+      context.strokeStyle = this.color
+      context.fillStyle = this.color
+      context.lineWidth = this.lineWidth
+    }
+
+    move(x, y) {
+      this.x1 += x
+      this.y1 += y
+      this.x2 += x
+      this.y2 += y
+    }
+  }
+
+  class Line extends Shape {
+    constructor(color, lineWidth, x1, y1, x2, y2) {
+      super(color, lineWidth, x1, y1, x2, y2)
+      this.shape = ShapeMap.Line
+    }
+
+    draw(context) {
+      super.draw(context)
+      context.beginPath()
+      context.moveTo(this.x1, this.y1)
+      context.lineTo(this.x2, this.y2)
+      context.stroke()
+    }
+
+    inside(context, x, y) {
+      const path2D = new Path2D()
+      path2D.moveTo(this.x1, this.y1)
+      path2D.lineTo(this.x2, this.y2)
+      return context.isPointInStroke(path2D, x, y)
+    }
+  }
+
+  class Rectangle extends Shape {
+    constructor(color, lineWidth, x1, y1, x2, y2) {
+      super(color, lineWidth, x1, y1, x2, y2)
+      this.shape = ShapeMap.Rectangle
+    }
+
+    // 计算出此时的width和height
+    get width() {
+      return this.x2 - this.x1
+    }
+
+    get height() {
+      return this.y2 - this.y1
+    }
+
+    draw(context) {
+      super.draw(context)
+      context.strokeRect(this.x1, this.y1, this.width, this.height)
+    }
+
+    inside(context, x, y) {
+      const path2D = new Path2D()
+      path2D.rect(this.x1, this.y1, this.width, this.height)
+      return context.isPointInStroke(path2D, x, y)
+    }
+  }
+
+  // FillRectangle直接继承Rectangle类即可
+  class FillRectangle extends Rectangle {
+    constructor(color, lineWidth, x1, y1, x2, y2) {
+      super(color, lineWidth, x1, y1, x2, y2)
+      this.shape = ShapeMap.FillRectangle
+    }
+
+    draw(context) {
+      super.draw(context)
+      context.fillRect(this.x1, this.y1, this.width, this.height)
+    }
+
+    inside(context, x, y) {
+      // 判断点(x, y)是否在矩形区域内即可
+      // 注意点：画矩形的时候 矩形的四个点都可能作为起始点 因此需要注意不能直接把起点坐标当成较小的值,终点坐标当成较大的值
+      const { x1, y1, width, height } = this
+      const inX = width > 0 ? x > x1 && x - x1 <= width : x < x1 && x - x1 >= width
+      const inY = height > 0 ? y > y1 && y - y1 <= height : y < y1 && y - y1 >= height
+      return inX && inY
+    }
+  }
+
+  class Circle extends Shape {
+    constructor(color, lineWidth, x1, y1, x2, y2) {
+      super(color, lineWidth, x1, y1, x2, y2)
+      this.shape = ShapeMap.Circle
+    }
+
+    // 计算出半径
+    get r() {
+      return Math.sqrt((this.y2 - this.y1) ** 2 + (this.x2 - this.x1) ** 2)
+    }
+
+    draw(context) {
+      super.draw(context)
+      context.beginPath()
+      context.arc(this.x1, this.y1, this.r, 0, Math.PI * 2)
+      context.stroke()
+    }
+
+    inside(context, x, y) {
+      const path2D = new Path2D()
+      path2D.arc(this.x1, this.y1, this.r, 0, Math.PI * 2)
+      return context.isPointInStroke(path2D, x, y)
+    }
+  }
+
+  // FillCircle直接继承Circle类即可
+  class FillCircle extends Circle {
+    constructor(color, lineWidth, x1, y1, x2, y2) {
+      super(color, lineWidth, x1, y1, x2, y2)
+      this.shape = ShapeMap.FillCircle
+    }
+
+    draw(context) {
+      super.draw(context)
+      context.beginPath()
+      context.arc(this.x1, this.y1, this.r, 0, Math.PI * 2)
+      context.fill()
+    }
+
+    inside(context, x, y) {
+      // 计算点(x, y)到圆心的距离是否小于半径即可
+      const { x1, y1, r } = this
+      return Math.sqrt((y - y1) ** 2 + (x - x1) ** 2) <= r
+    }
+  }
+</script>
+</body>
+<body>
+<label for="color">
+  <span>请选择颜色：</span>
+  <input id="color" type="color">
+</label>
+<label for="lineWidth">
+  <span>请设置线宽：</span>
+  <input id="lineWidth" type="number" value="2" min="1" max="10">
+</label>
+<button id="export-image" title="以图片的形式将画布中的图形保存到本地">导出图片</button>
+<button id="export-file" title="以文件的形式将画布中的图形保存到本地">导出文件</button>
+<button id="import-file" title="将之前保存的文件再次导入到画布中">导入文件</button>
+<fieldset>
+  <legend>选择要画的形状：</legend>
+  <label for="Line">
+    <input type="radio" id="Line" value="Line" name="shape" checked>
+    <span>直线</span>
+  </label>
+  <label for="Rectangle">
+    <input type="radio" id="Rectangle" value="Rectangle" name="shape">
+    <span>矩形</span>
+  </label>
+  <label for="FillRectangle">
+    <input type="radio" id="FillRectangle" value="FillRectangle" name="shape">
+    <span>矩形(填充)</span>
+  </label>
+  <label for="Circle">
+    <input type="radio" id="Circle" value="Circle" name="shape">
+    <span>圆形</span>
+  </label>
+  <label for="FillCircle">
+    <input type="radio" id="FillCircle" value="FillCircle" name="shape">
+    <span>圆形(填充)</span>
+  </label>
+</fieldset>
+<br>
+<div class="wrapper">
+  <canvas width="1500" height="750"></canvas>
+</div>
+<script>
+  const NO_CONTENT_TIP = '您还没有向画布中添加图形'
+  // 工具函数：导出图片
+  function exportImage(base64) {
+    const link = document.createElement('a')
+    link.href = base64
+    link.download = 'canvas.png'
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+  }
+
+  // 工具函数：将画布上的形状以文件的形式导出
+  function exportFile(shapes) {
+    if (shapes.length === 0) {
+      return alert(NO_CONTENT_TIP)
+    }
+    const json = JSON.stringify(shapes)
+    const link = document.createElement('a')
+    const blob = new Blob([json])
+    const url = URL.createObjectURL(blob)
+    link.href = url
+    link.download = 'canvas.json'
+    document.body.appendChild(link)
+    link.click()
+    URL.revokeObjectURL(url)
+    link.remove()
+  }
+
+  // 工具函数：根据导入文件的shapes数组填充画布
+  function drawShapesFromFile(shapesArr) {
+    // 不清空画布，在现有的画布基础上添加图形
+    const _shapes = shapesArr.map(shape => {
+      const { shape: _shape, color, lineWidth, x1, y1, x2, y2 } = shape
+      return createShape(_shape, color, lineWidth, x1, y1, x2, y2)
+    })
+    shapes.push(..._shapes)
+    drawShapes()
+  }
+
+  const inputColor = document.querySelector('#color')
+  const inputLineWidth = document.querySelector('#lineWidth')
+  const buttonImportFile = document.querySelector('#import-file')
+  const buttonExportImage = document.querySelector('#export-image')
+  const buttonExportFile = document.querySelector('#export-file')
+
+  const radios = document.querySelectorAll('input[type="radio"]')
+  const canvas = document.querySelector('canvas')
+  const context = canvas.getContext('2d')
+  // 当前的形状
+  let _shape = ShapeMap.Line
+  let color = inputColor.value
+  let lineWidth = inputLineWidth.value
+  context.lineWidth = lineWidth
+  radios.forEach(radio => radio.onchange = e => _shape = e.target.value)
+
+  // 监听颜色改变事件
+  inputColor.addEventListener('input', e => color = e.target.value)
+  // 监听线宽改变事件
+  inputLineWidth.addEventListener('change', e => lineWidth = e.target.value)
+  // 监听点击导入文件按钮
+  buttonImportFile.addEventListener('click', () => {
+    const input = document.createElement('input')
+    input.setAttribute('type', 'file')
+    input.setAttribute('accept', '.json')
+    document.body.appendChild(input)
+    input.click()
+    input.onchange = e => {
+      const file = e.target.files[0]
+      const reader = new FileReader()
+      reader.onload = e1 => {
+        const json = e1.target.result || ''
+        // 判断是不是合法的json格式
+        try {
+          const shapes = JSON.parse(json)
+          drawShapesFromFile(shapes)
+        } catch (_) {
+          return alert('该文件内容不是合法的json格式，请检查')
+        }
+      }
+      reader.readAsText(file)
+      // 将input元素移除dom
+      input.remove()
+    }
+  })
+
+  // 点击导出图片按钮
+  buttonExportImage.addEventListener('click', () => {
+    if (shapes.length === 0) {
+      return alert(NO_CONTENT_TIP)
+    }
+    exportImage(canvas.toDataURL())
+  })
+  // 点击导出文件按钮
+  buttonExportFile.addEventListener('click', () => {
+    exportFile(shapes)
+  })
+
+  const shapes = []
+  let mousedown = false
+
+  const drawShapes = () => {
+    // 清空画布
+    context.clearRect(0, 0, canvas.width, canvas.height)
+    // 再将图形全都画出来
+    shapes.forEach(shape => shape.draw && shape.draw(context))
+  }
+
+  const isInside = (context, x, y) => {
+    // 倒叙遍历
+    for (let i = shapes.length - 1; i >= 0 ; i--) {
+      if (shapes[i] && shapes[i].inside(context, x, y)) {
+        return { inside: true, shape: shapes[i] }
+      }
+    }
+    return { inside: false, shape: null }
+  }
+
+  const createShape = (shape, color, lineWidth, x1, y1, x2, y2) => {
+    if (shape === ShapeMap.Line) {
+      return new Line(color, lineWidth, x1, y1, x2, y2)
+    }
+    if (shape === ShapeMap.Rectangle) {
+      return new Rectangle(color, lineWidth, x1, y1, x2, y2)
+    }
+    if (shape === ShapeMap.FillRectangle) {
+      return new FillRectangle(color, lineWidth, x1, y1, x2, y2)
+    }
+    if (shape === ShapeMap.Circle) {
+      return new Circle(color, lineWidth, x1, y1, x2, y2)
+    }
+    if (shape === ShapeMap.FillCircle) {
+      return new FillCircle(color, lineWidth, x1, y1, x2, y2)
+    }
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    if (mousedown) return
+    if (shapes.length && isInside(context, e.offsetX, e.offsetY).inside) {
+      canvas.style.cursor = 'pointer'
+    } else {
+      canvas.style.cursor = 'auto'
+    }
+  })
+
+  canvas.addEventListener('mousedown', e => {
+    mousedown = true
+    let { inside, shape } = isInside(context, e.offsetX, e.offsetY)
+    if (!inside) {
+      // 新增操作
+      shape = createShape(_shape, color, lineWidth, e.offsetX, e.offsetY, e.offsetX, e.offsetY)
+      shapes.push(shape)
+      drawShapes()
+    }
+
+    // 监听mousemove&mouseup事件
+    const mousemove = e1 => {
+      if (!inside) {
+        // 新增操作
+        shape.x2 = e1.offsetX
+        shape.y2 = e1.offsetY
+      } else {
+        // 拖动操作
+        shape.move(e1.movementX, e1.movementY)
+      }
+      drawShapes()
+    }
+    const mouseup = () => {
+      mousedown = false
+      canvas.removeEventListener('mousemove', mousemove)
+      canvas.removeEventListener('mouseup', mouseup)
+    }
+
+    canvas.addEventListener('mousemove', mousemove)
+    canvas.addEventListener('mouseup', mouseup)
+  })
+</script>
+</body>
+</html>
